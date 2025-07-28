@@ -52,7 +52,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Generate Changelog Preview with git-cliff
-        run: git cliff --unreleased --output NEXT-CHANGELOG-ENTRY.md --strip header
+        run: git cliff --unreleased --output NEXT-CHANGELOG-ENTRY.md --strip header --bump
 
       - name: Create Release PR or Prepare for Publish
         id: changesets
