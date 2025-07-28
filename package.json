@@ -15,7 +15,7 @@
 		"gen:sdk": "turbo run gen:sdk",
 		"lint": "turbo lint",
 		"test": "turbo test",
-		"version": "git cliff --unreleased --output NEXT-CHANGELOG-ENTRY.md --strip header --bump && npx changeset version",
+		"changeset:version": "git cliff --unreleased --output NEXT-CHANGELOG-ENTRY.md --strip header --bump && npx changeset version",
 		"test:e2e": "turbo test:e2e",
 		"test:unit": "turbo test:unit"
 	},
