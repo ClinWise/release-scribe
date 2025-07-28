@@ -3,7 +3,7 @@
 	"version": "1.0.0",
 	"private": true,
 	"scripts": {
-		"build": "echo 'Simulating build...'",
+		"build": "mkdir -p dist && touch dist/index.js && echo 'Simulating build...'",
 		"lint": "echo 'Simulating lint...'",
 		"gen:prisma-all": "echo 'Simulating Prisma client generation...'",
 		"test:unit": "echo 'Simulating unit tests...'"

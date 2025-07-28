@@ -187,16 +187,14 @@ jobs:
         with:
           path: |
             apps/api/dist
-            apps/web/.svelte-kit
             packages/sdk/dist
           key: ${{ runner.os }}-build-${{ github.sha }}
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: medihub-build-artifacts
+          name: release-scribe-build-artifacts
           path: |
             apps/api/dist
-            apps/web/.svelte-kit
             packages/sdk/dist
           retention-days: 5 # Artifact retention days, adjustable as needed

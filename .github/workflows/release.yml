@@ -17,7 +17,7 @@ env:
 jobs:
   release:
     # prevents this action from running on forks
-    if: github.repository == 'clinwise/medihub' && github.event.workflow_run.conclusion == 'success'
+    if: github.repository == 'clinwise/release-scribe' && github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: write # to create release (changesets/action, git-cliff)
       pull-requests: write # to create pull request (changesets/action)
