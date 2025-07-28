@@ -1,5 +1,11 @@
 # @app/api
 
+## 1.0.4
+
+### Patch Changes
+
+- c6a37fb: use version script
+
 ## 1.0.3
 
 ### Patch Changes

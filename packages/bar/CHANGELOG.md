@@ -1,5 +1,11 @@
 # @repo/bar
 
+## 1.0.3
+
+### Patch Changes
+
+- c6a37fb: use version script
+
 ## 1.0.2
 
 ### Patch Changes
