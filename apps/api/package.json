@@ -1,6 +1,6 @@
 {
 	"name": "@app/api",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"private": true,
 	"scripts": {
 		"build": "mkdir -p dist && touch dist/index.js && echo 'Simulating build...'",
