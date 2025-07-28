@@ -1,5 +1,12 @@
 # @repo/foo
 
+## 1.0.3
+
+### Patch Changes
+
+- 554ca42: new changeset-version script
+- c6a37fb: use version script
+
 ## 1.0.2
 
 ### Patch Changes
