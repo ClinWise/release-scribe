@@ -1,5 +1,13 @@
 # @app/web
 
+## 1.0.5
+
+### Patch Changes
+
+- 51caff7: test
+- 85ac11a: Fix the issue where the update log in NEXT-CHANGELOG-ENTRY is empty
+- 6264eff: Modify the version update logic of package.json in the project root directory in the changeset-version script
+
 ## 1.0.4
 
 ### Patch Changes
