@@ -1,5 +1,11 @@
 # @repo/foo
 
+## 1.0.2
+
+### Patch Changes
+
+- 39dac88: test
+
 ## 1.0.1
 
 ### Patch Changes
