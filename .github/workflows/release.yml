@@ -1,0 +1,128 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_run:
+    workflows: ["Continuous Integration"]
+    types:
+      - completed
+
+env:
+  # Keep consistent with ci.yml
+  NODE_VERSION: '20'
+  HUSKY: 0 # Disable husky hooks
+
+jobs:
+  release:
+    # prevents this action from running on forks
+    if: github.repository == 'clinwise/medihub' && github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: write # to create release (changesets/action, git-cliff)
+      pull-requests: write # to create pull request (changesets/action)
+    name: Create Release or Publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          # We need to fetch history to generate changelog
+          fetch-depth: 0
+          # Need to push tag in hasChangesets == 'false' path
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Node.JS
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install Dependencies
+        run: npm install --ignore-scripts # Ignore husky post-install
+
+      - name: Install git-cliff
+        uses: kenji-miyake/setup-git-cliff@v2
+        with:
+          version: 'latest'
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create Release PR or Prepare for Publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          # The version command will execute version-script.js, which calls "changeset version"
+          # and generates NEXT-CHANGELOG-ENTRY.md.
+          # The action will automatically commit all changes (including NEXT-CHANGELOG-ENTRY.md) to the PR.
+          version: |
+            git cliff --unreleased --output NEXT-CHANGELOG-ENTRY.md --strip header
+            npx changeset version
+          title: "chore(release): version packages"
+          commit: "chore(release): version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publishing Process
+        id: publish
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        run: |
+          # Only publish if NEXT-CHANGELOG-ENTRY.md exists and is not empty
+          if [ -s NEXT-CHANGELOG-ENTRY.md ]; then
+            echo "NEXT-CHANGELOG-ENTRY.md detected, starting publishing process."
+            
+            BUMPED_VERSION=$(git cliff --bumped-version)
+            if [ -z "$BUMPED_VERSION" ]; then
+              echo "git-cliff could not determine a new version number. No eligible conventional commits found."
+              # Even if no bumped_version, still need to clean log and push to avoid loop
+              # But we set released to false
+              > NEXT-CHANGELOG-ENTRY.md
+              git add NEXT-CHANGELOG-ENTRY.md
+              git commit -m "chore(release): clear changelog entry"
+              git push origin main
+              echo "released=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "BUMPED_VERSION=${BUMPED_VERSION}" >> "$GITHUB_ENV"
+
+            # Prepare release notes
+            echo "## ${BUMPED_VERSION} - $(date +'%Y-%m-%d')" > RELEASE_NOTES.md
+            cat NEXT-CHANGELOG-ENTRY.md >> RELEASE_NOTES.md
+
+            # Update main CHANGELOG.md
+            # This is a more robust method that adds new logs to the top of the file while preserving the original file
+            TEMP_CHANGELOG=$(mktemp)
+            cat RELEASE_NOTES.md CHANGELOG.md > "$TEMP_CHANGELOG"
+            mv "$TEMP_CHANGELOG" CHANGELOG.md
+
+            # Clean up NEXT-CHANGELOG-ENTRY.md
+            > NEXT-CHANGELOG-ENTRY.md
+            
+            # Commit changes
+            git add CHANGELOG.md NEXT-CHANGELOG-ENTRY.md
+            git commit -m "chore(release): update changelog for ${BUMPED_VERSION}"
+            
+            # Create and Push Tag
+            git tag -a "${BUMPED_VERSION}" -m "Release ${BUMPED_VERSION}"
+            git push origin main --follow-tags
+            
+            # Set outputs for next step
+            echo "tag_name=${BUMPED_VERSION}" >> $GITHUB_OUTPUT
+            echo "release_body_path=RELEASE_NOTES.md" >> $GITHUB_OUTPUT
+            echo "released=true" >> $GITHUB_OUTPUT
+          else
+            echo "NEXT-CHANGELOG-ENTRY.md not found or is empty, skipping release."
+            echo "released=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        if: steps.publish.outputs.released == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.publish.outputs.tag_name }}
+          body_path: ${{ steps.publish.outputs.release_body_path }}
+          repository: ${{ github.repository }}
+          token: ${{ secrets.GITHUB_TOKEN }}
