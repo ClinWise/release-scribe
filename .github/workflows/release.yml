@@ -58,9 +58,7 @@ jobs:
           # The version command will execute version-script.js, which calls "changeset version"
           # and generates NEXT-CHANGELOG-ENTRY.md.
           # The action will automatically commit all changes (including NEXT-CHANGELOG-ENTRY.md) to the PR.
-          version: |
-            git cliff --unreleased --output NEXT-CHANGELOG-ENTRY.md --strip header
-            npx changeset version
+          version: npm run version
           title: "chore(release): version packages"
           commit: "chore(release): version packages"
         env:
