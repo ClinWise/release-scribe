@@ -1,5 +1,11 @@
 {
 	"name": "@app/api",
 	"version": "1.0.0",
-	"private": true
+	"private": true,
+	"scripts": {
+		"build": "echo 'Simulating build...'",
+		"lint": "echo 'Simulating lint...'",
+		"gen:prisma-all": "echo 'Simulating Prisma client generation...'",
+		"test:unit": "echo 'Simulating unit tests...'"
+	}
 }

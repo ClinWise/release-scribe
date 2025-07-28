@@ -2,15 +2,21 @@
 	"name": "release-scribe-monorepo",
 	"version": "1.0.0",
 	"private": true,
+	"engines": {
+		"node": ">=18"
+	},
+	"packageManager": "npm@10.9.0",
 	"workspaces": [
-		"packages/*",
-		"apps/*"
+		"apps/*",
+		"packages/*"
 	],
 	"scripts": {
-		"gen:prisma-all": "echo 'Simulating Prisma client generation...'",
-		"lint": "echo 'Simulating linting...'",
-		"test:unit": "echo 'Simulating unit tests...'",
-		"build": "echo 'Simulating build...'"
+		"build": "turbo build",
+		"gen:sdk": "turbo run gen:sdk",
+		"lint": "turbo lint",
+		"test": "turbo test",
+		"test:e2e": "turbo test:e2e",
+		"test:unit": "turbo test:unit"
 	},
 	"devDependencies": {
 		"@changesets/cli": "^2.29.4",

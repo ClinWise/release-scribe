@@ -1,5 +1,11 @@
 {
 	"name": "@app/web",
 	"version": "1.0.0",
-	"private": true
+	"private": true,
+	"scripts": {
+		"build": "echo 'Simulating build...'",
+		"lint": "echo 'Simulating lint...'",
+		"test:unit": "echo 'Simulating unit tests...'",
+		"test:e2e": "echo 'Simulating e2e tests...'"
+	}
 }

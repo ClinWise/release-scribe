@@ -20,3 +20,9 @@ Key Features:
 - 👀 Reviewable Release Notes: The "preview" changelog in the PR ensures transparency and quality control before a release goes live.
 - 🚀 Zero-Config Goal: Designed to work out-of-the-box for most standard setups.
 - 🌳 Monorepo-Ready: Inherits changesets' excellent support for monorepos.
+
+## Bonus: Prisma Support
+
+This workflow includes caching and generation steps for Prisma clients, demonstrating how to integrate database-related tasks into your CI/CD pipeline.
+
+While not entirely generic, if you use Prisma, this might provide some valuable insights.
