@@ -15,12 +15,13 @@
 		"gen:sdk": "turbo run gen:sdk",
 		"lint": "turbo lint",
 		"test": "turbo test",
+		"version": "git cliff --unreleased --output NEXT-CHANGELOG-ENTRY.md --strip header --bump && npx changeset version",
 		"test:e2e": "turbo test:e2e",
 		"test:unit": "turbo test:unit"
 	},
 	"devDependencies": {
 		"@changesets/cli": "^2.29.4",
 		"turbo": "^2.4.1",
-		"git-cliff": "^1.x.x"
+		"git-cliff": "^2.10.0"
 	}
 }
