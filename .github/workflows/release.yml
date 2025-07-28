@@ -51,6 +51,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Generate Changelog Preview with git-cliff
+        run: git cliff --unreleased --output NEXT-CHANGELOG-ENTRY.md --strip header
+
       - name: Create Release PR or Prepare for Publish
         id: changesets
         uses: changesets/action@v1
@@ -58,7 +61,9 @@ jobs:
           # The version command will execute version-script.js, which calls "changeset version"
           # and generates NEXT-CHANGELOG-ENTRY.md.
           # The action will automatically commit all changes (including NEXT-CHANGELOG-ENTRY.md) to the PR.
-          version: npm run version
+          # We no longer provide a custom version command here. The action will default to 'npx changeset version'.
+          # We'll run git cliff as a separate step.
+          # version: npm run version
           title: "chore(release): version packages"
           commit: "chore(release): version packages"
         env:
