@@ -8,6 +8,8 @@ on:
     workflows: ["Continuous Integration"]
     types:
       - completed
+    branches:
+      - main
 
 env:
   # Keep consistent with ci.yml
@@ -17,7 +19,7 @@ env:
 jobs:
   release:
     # prevents this action from running on forks
-    if: github.repository == 'clinwise/release-scribe' && github.event.workflow_run.conclusion == 'success'
+    if: github.repository == 'clinwise/release-scribe' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
     permissions:
       contents: write # to create release (changesets/action, git-cliff)
       pull-requests: write # to create pull request (changesets/action)
@@ -31,6 +33,26 @@ jobs:
           fetch-depth: 0
           # Need to push tag in hasChangesets == 'false' path
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 检查最新提交是否包含 Changeset
+        id: check_latest_commit_changesets
+        # only run this check when workflow_run is triggered and head_branch is main
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main'
+        run: |
+          # get the latest commit SHA of the main branch
+          # note: HEAD is already the latest main branch after checkout
+          MAIN_COMMIT_SHA=$(git rev-parse HEAD)
+          # get the previous commit SHA
+          PREVIOUS_COMMIT_SHA=$(git rev-parse HEAD~1)
+
+          # check if there are any changes in the .changeset directory (except README.md)
+          # if there are any non-README.md .md files changed, then it contains new changeset
+          if git diff --name-only "$PREVIOUS_COMMIT_SHA" "$MAIN_COMMIT_SHA" | grep -qE '\.changeset/[^/]+\.md$'; then
+            echo "latest_commit_has_changesets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "latest_commit_has_changesets=false" >> "$GITHUB_OUTPUT"
+          fi
+  
 
       - name: Configure Node.JS
         uses: actions/setup-node@v4
@@ -53,6 +75,10 @@ jobs:
 
       - name: Create Release PR or Prepare for Publish
         id: changesets
+        # only run when:
+        # 1. direct push to main (usually after merging a PR with changesets)
+        # 2. workflow_run triggered, and the latest commit contains changesets
+        if: github.event_name == 'push' || (github.event_name == 'workflow_run' && steps.check_latest_commit_changesets.outputs.latest_commit_has_changesets == 'true')
         uses: changesets/action@v1
         with:
           version: npm run changeset:version
