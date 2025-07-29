@@ -34,7 +34,7 @@ jobs:
           # Need to push tag in hasChangesets == 'false' path
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 检查最新提交是否包含 Changeset
+      - name: Check if the latest commit contains Changeset
         id: check_latest_commit_changesets
         # only run this check when workflow_run is triggered and head_branch is main
         if: github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main'

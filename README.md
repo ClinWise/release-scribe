@@ -29,6 +29,10 @@ Key Features:
 > 
 > While not entirely generic, if you use Prisma, this might provide some valuable insights.
 
+## Customizing the Version PR
+
+When the changesets bot opens a version-package pull request, you may fine-tune the generated changelog to improve clarity and tone. Be aware that any modification to the version package MUST be performed at the very last moment—immediately before merging the PR. At that point the `main` branch has to be frozen: do **not** merge any other pull request that contains changeset files, otherwise the changesets action will issue a force-push which overwrites all your handcrafted commits in the version PR.
+
 ## The Workflow
 
 ```mermaid
