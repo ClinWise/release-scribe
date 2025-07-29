@@ -1,5 +1,12 @@
 # @repo/bar
 
+## 1.0.5
+
+### Patch Changes
+
+- da37ae6: Avoid triggering changes within the version package PR itself
+- 94a0889: Attempt to fix the issue where the modification to NEXT-CHANGELOG-ENTRY.md in the version package pr is invalid
+
 ## 1.0.4
 
 ### Patch Changes
