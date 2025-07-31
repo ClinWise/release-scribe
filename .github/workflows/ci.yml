@@ -16,13 +16,9 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  setup:
-    name: Environment Setup and Dependency Installation
+  ci:
+    name: Lint, Test and Build
     runs-on: ubuntu-latest
-    outputs:
-      cache-hit: ${{ steps.cache-node-modules.outputs.cache-hit }}
-      prisma-cache-hit: ${{ steps.cache-prisma-generated.outputs.cache-hit }}
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -33,168 +29,17 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Cache node_modules
-        id: cache-node-modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-
-
       - name: Install Dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
-      - name: Cache Prisma Client
-        id: cache-prisma-generated
-        uses: actions/cache@v4
-        with:
-          path: |
-            apps/api/prisma/generated
-            packages/database/generated
-          key: ${{ runner.os }}-prisma-generated-${{ hashFiles('apps/api/prisma/schema/**/*.prisma', 'packages/database/**/*.prisma') }}
-          restore-keys: |
-            ${{ runner.os }}-prisma-generated-
-
       - name: Generate Prisma Client
-        if: steps.cache-prisma-generated.outputs.cache-hit != 'true'
+        # We can let turbo handle the caching for this
         run: npx turbo run gen:prisma-all
 
-  lint-and-typecheck:
-    name: Type Check and Linting
-    runs-on: ubuntu-latest
-    needs: setup
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Configure Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Restore node_modules Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-
-    
-      - name: Restore Prisma Client Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            apps/api/prisma/generated
-            packages/database/generated
-          key: ${{ runner.os }}-prisma-generated-${{ hashFiles('apps/api/prisma/schema/**/*.prisma', 'packages/database/**/*.prisma') }}
-          restore-keys: |
-            ${{ runner.os }}-prisma-generated-
-      
-      - name: Run Linting
-        run: npx turbo run lint
-
-  test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    needs: setup
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Configure Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Restore node_modules Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-
-
-      - name: Restore Prisma Client Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            apps/api/prisma/generated
-            packages/database/generated
-          key: ${{ runner.os }}-prisma-generated-${{ hashFiles('apps/api/prisma/schema/**/*.prisma', 'packages/database/**/*.prisma') }}
-          restore-keys: |
-            ${{ runner.os }}-prisma-generated-
-
-      - name: Run Unit Tests
-        run: npx turbo run test:unit
-
-  build:
-    name: Build Project
-    runs-on: ubuntu-latest
-    needs: [setup, lint-and-typecheck, test]
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Configure Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Restore node_modules Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            node_modules
-            apps/*/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-modules-
-
-      - name: Restore Prisma Client Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            apps/api/prisma/generated
-            packages/database/generated
-          key: ${{ runner.os }}-prisma-generated-${{ hashFiles('apps/api/prisma/schema/**/*.prisma', 'packages/database/**/*.prisma') }}
-          restore-keys: |
-            ${{ runner.os }}-prisma-generated-
-
-      - name: Compile and Build
-        run: npx turbo run build
+      - name: Run Lint, Test, and Build
+        run: npx turbo run lint test:unit build
         env:
+          # Env vars for build step
           NODE_ENV: development
           VITE_API_BASE_URL: ${{ vars.CI_API_BASE_URL }}
           VITE_APP_ENV: ci
-
-      - name: Cache Build Output
-        uses: actions/cache@v4
-        with:
-          path: |
-            apps/api/dist
-            packages/sdk/dist
-          key: ${{ runner.os }}-build-${{ github.sha }}
-
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-scribe-build-artifacts
-          path: |
-            apps/api/dist
-            packages/sdk/dist
-          retention-days: 5 # Artifact retention days, adjustable as needed
