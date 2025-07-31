@@ -1,5 +1,11 @@
 # @repo/bar
 
+## 1.0.6
+
+### Patch Changes
+
+- c91b9ab: Try to optimize the speed of CI workflow
+
 ## 1.0.5
 
 ### Patch Changes

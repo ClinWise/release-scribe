@@ -1,6 +1,6 @@
 {
 	"name": "@app/web",
-	"version": "1.0.6",
+	"version": "1.0.7",
 	"private": true,
 	"scripts": {
 		"build": "mkdir -p dist && touch dist/index.js && echo 'Simulating build...'",
