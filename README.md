@@ -1,7 +1,13 @@
-# Release-Scribe
+<div align="center">
 
-- [![Continuous Integration](https://github.com/ClinWise/release-scribe/actions/workflows/ci.yml/badge.svg)](https://github.com/ClinWise/release-scribe/actions/workflows/ci.yml)
-- [![Release](https://github.com/ClinWise/release-scribe/actions/workflows/release.yml/badge.svg)](https://github.com/ClinWise/release-scribe/actions/workflows/release.yml)
+![Release Scribe](./.github/logo.webp)
+
+*A powerful, automated release workflow for monorepos, powered by the trifecta of Turborepo, Changesets, and git-cliff.*
+
+[![Continuous Integration](https://github.com/ClinWise/release-scribe/actions/workflows/ci.yml/badge.svg)](https://github.com/ClinWise/release-scribe/actions/workflows/ci.yml)
+[![Release](https://github.com/ClinWise/release-scribe/actions/workflows/release.yml/badge.svg)](https://github.com/ClinWise/release-scribe/actions/workflows/release.yml)
+
+</div>
 
 This GitHub action workflow template provides a robust, automated release workflow by seamlessly integrating
 [changesets/action](https://github.com/changesets/action) with [git-cliff](https://github.com/orhun/git-cliff).
@@ -17,13 +23,13 @@ Its key feature is a unique two-step changelog process:
 2. Publish: Once the PR is merged, the action automatically updates the root CHANGELOG.md, creates a new Git tag, and publishes a polished GitHub Release.
 
 Key Features:
-- 🔄 Automated Versioning: Leverages changesets to manage package versions.
-- ✨ Rich Changelogs: Uses git-cliff to generate detailed changelogs from Conventional Commits.
-- 👀 Reviewable Release Notes: The "preview" changelog in the PR ensures transparency and quality control before a release goes live.
-- 🚀 Zero-Config Goal: Designed to work out-of-the-box for most standard setups.
-- 🌳 Monorepo-Ready: Inherits changesets' excellent support for monorepos.
+- 🚀 **Turborepo-Optimized**: High-speed CI leveraging Turborepo's caching and task orchestration.
+- 🔄 **Automated Versioning**: Leverages changesets to manage package versions across the monorepo.
+- ✨ **Rich Changelogs**: Uses git-cliff to generate detailed changelogs from Conventional Commits.
+- 👀 **Reviewable Release Notes**: The "preview" changelog in the PR ensures transparency and quality control before a release goes live.
+- 🌳 **Monorepo-Ready**: Inherits changesets' excellent support for monorepos.
 
-> Bonus: Prisma Support
+> **Bonus: Prisma Support**
 > 
 > This workflow includes caching and generation steps for Prisma clients, demonstrating how to integrate database-related tasks into your CI/CD pipeline.
 > 
@@ -35,49 +41,33 @@ When the changesets bot opens a version-package pull request, you may fine-tune 
 
 ## The Workflow
 
+Here is a high-level overview of the CI and Release process:
+
+
 ```mermaid
 graph TD
-    start[Start] --> trigger_events{Trigger Events};
+    subgraph "CI Pipeline (ci.yml)"
+        A[Push to main/develop or PR] --> B{Run CI Job};
+        B --> C[Checkout & Setup];
+        C --> D[Install Dependencies];
+        D --> E[Run Lint, Test & Build];
+    end
 
-    trigger_events -- "push to main branch" --> job_conditions;
-    trigger_events -- "CI workflow completed" --> job_conditions;
+    subgraph "Release Pipeline (release.yml)"
+        F{CI on 'main' branch succeeds} --> G[Trigger Release Workflow];
+        G --> H{Checkout & Install};
+        H --> I{Has new changesets?};
+        I -- Yes --> J["🤖 changesets/action:<br/>- Bumps versions<br/>- Updates changelogs<br/>- Creates 'Version Packages' PR"];
+        J --> K[PR Merged by User];
 
-    job_conditions{"CI workflow successful?"} -- True --> checkout_repo["Checkout Repository"];
-    job_conditions -- False --> end_node[End];
+        I -- No --> L["▶️ Publish Flow:<br/>Triggered after 'Version Packages' PR merge"];
+        L --> M{NEXT-CHANGELOG-ENTRY.md exists?};
+        M -- Yes --> N["CLIFF git-cliff:<br/>- Generates release notes<br/>- Updates main CHANGELOG.md"];
+        N --> O["- Commit changelog<br/>- Create & Push Git Tag"];
+        O --> P[🚀 Create GitHub Release];
+        M -- No --> Q[⏹️ Skip Release];
+    end
 
-    checkout_repo --> setup_node["Setup Node.JS"];
-    setup_node --> install_deps["Install Dependencies"];
-    install_deps --> install_git_cliff["Install git-cliff"];
-    install_git_cliff --> config_git["Configure Git"];
-    config_git --> run_changesets["changesets/action: Create Version PR or Prepare Release"];
-
-    run_changesets -- "hasChangesets == 'true'" --> changesets_pr_done["Version PR Created"];
-    run_changesets -- "hasChangesets == 'false'" --> publish_step_start["Enter Publish Flow"];
-
-    publish_step_start --> check_changelog_file{"NEXT-CHANGELOG-ENTRY.md exists and is not empty?"};
-
-    check_changelog_file -- Yes --> get_bumped_ver["Get BUMPED_VERSION"];
-    check_changelog_file -- No --> set_released_false_skip["Set released=false (Skip Release)"];
-
-    get_bumped_ver --> check_bumped_ver{"BUMPED_VERSION is empty?"};
-
-    check_bumped_ver -- Yes --> handle_no_bump["Clean NEXT-CHANGELOG-ENTRY.md"];
-    check_bumped_ver -- No --> prepare_release_notes["Prepare RELEASE_NOTES.md"];
-
-    prepare_release_notes --> update_main_changelog["Update Main CHANGELOG.md"];
-    update_main_changelog --> clean_next_changelog["Clean NEXT-CHANGELOG-ENTRY.md"];
-    clean_next_changelog --> commit_release_changes["Commit Release Changes"];
-    commit_release_changes --> create_push_tag["Create and Push Tag"];
-    create_push_tag --> set_released_true["Set released=true"];
-
-    set_released_true --> create_github_release_cond;
-    handle_no_bump --> create_github_release_cond;
-    set_released_false_skip --> create_github_release_cond;
-
-    create_github_release_cond{"released == 'true'?"};
-    create_github_release_cond -- Yes --> create_gh_release["Create GitHub Release"];
-    create_github_release_cond -- No --> end_node;
-
-    create_gh_release --> end_node;
-    changesets_pr_done --> end_node;
+    E --> F;
+    K --> G;
 ```
