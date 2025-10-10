@@ -1,5 +1,11 @@
 # @repo/foo
 
+## 1.0.7
+
+### Patch Changes
+
+- ce68e43: Fix duplicate version number headers in release notes
+
 ## 1.0.6
 
 ### Patch Changes
