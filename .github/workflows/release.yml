@@ -110,7 +110,6 @@ jobs:
             echo "BUMPED_VERSION=${BUMPED_VERSION}" >> "$GITHUB_ENV"
 
             # Prepare release notes
-            echo "## ${BUMPED_VERSION} - $(date +'%Y-%m-%d')" > RELEASE_NOTES.md
             cat NEXT-CHANGELOG-ENTRY.md >> RELEASE_NOTES.md
 
             # Update main CHANGELOG.md
