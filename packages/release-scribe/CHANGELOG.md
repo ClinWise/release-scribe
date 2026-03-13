@@ -1,5 +1,12 @@
 # @clinwise/release-scribe
 
+## 0.1.1
+
+### Patch Changes
+
+- e9a3f92: Trigger a follow-up patch release for `@clinwise/release-scribe` so the template can
+  re-run the full changesets flow after the repository release finalization fix.
+
 ## 0.1.0
 
 ### Minor Changes
