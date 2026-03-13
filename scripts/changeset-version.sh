@@ -2,8 +2,10 @@
 
 set -euo pipefail
 
+CLIFF_CONTEXT="$(pnpm exec git-cliff --unreleased --bump --context)"
+
 BUMPED_VERSION="$(
-  pnpm exec git-cliff --unreleased --bump --context | node -e '
+  printf '%s' "${CLIFF_CONTEXT}" | node -e '
     let data = "";
     process.stdin.setEncoding("utf8");
     process.stdin.on("data", (chunk) => {
