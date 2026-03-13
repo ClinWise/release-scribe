@@ -68,11 +68,62 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publishing Process
-        id: publish
-        if: steps.changesets.outputs.published == 'true'
+      - name: Determine Release Finalization
+        id: finalize
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          PUBLISHED: ${{ steps.changesets.outputs.published }}
         run: |
           RELEASE_VERSION=$(node -p "require('./package.json').version")
+          echo "release_version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
+
+          CHANGE_RANGE_START="${BEFORE_SHA}"
+          if [ -z "${CHANGE_RANGE_START}" ] || [ "${CHANGE_RANGE_START}" = "0000000000000000000000000000000000000000" ]; then
+            CHANGE_RANGE_START="$(git rev-list --max-count=1 HEAD^ 2>/dev/null || true)"
+          fi
+
+          if [ -n "${CHANGE_RANGE_START}" ]; then
+            CHANGED_FILES="$(git diff --name-only "${CHANGE_RANGE_START}" "${GITHUB_SHA}")"
+          else
+            CHANGED_FILES="$(git show --pretty='' --name-only "${GITHUB_SHA}")"
+          fi
+
+          ROOT_VERSION_CHANGED=false
+          PACKAGE_RELEASE_FILES_CHANGED=false
+
+          if printf '%s\n' "${CHANGED_FILES}" | grep -qx 'package.json'; then
+            ROOT_VERSION_CHANGED=true
+          fi
+
+          if printf '%s\n' "${CHANGED_FILES}" | grep -Eq '^packages/[^/]+/(CHANGELOG\.md|package\.json)$|^NEXT-CHANGELOG-ENTRY\.md$'; then
+            PACKAGE_RELEASE_FILES_CHANGED=true
+          fi
+
+          TAG_EXISTS=false
+          if git rev-parse -q --verify "refs/tags/${RELEASE_VERSION}" >/dev/null; then
+            TAG_EXISTS=true
+          fi
+
+          SHOULD_FINALIZE=false
+          if [ "${PUBLISHED}" = "true" ]; then
+            SHOULD_FINALIZE=true
+          elif [ "${ROOT_VERSION_CHANGED}" = "true" ] && [ "${PACKAGE_RELEASE_FILES_CHANGED}" = "true" ] && [ "${TAG_EXISTS}" = "false" ]; then
+            SHOULD_FINALIZE=true
+          fi
+
+          echo "root_version_changed=${ROOT_VERSION_CHANGED}" >> "$GITHUB_OUTPUT"
+          echo "package_release_files_changed=${PACKAGE_RELEASE_FILES_CHANGED}" >> "$GITHUB_OUTPUT"
+          echo "tag_exists=${TAG_EXISTS}" >> "$GITHUB_OUTPUT"
+          echo "should_finalize=${SHOULD_FINALIZE}" >> "$GITHUB_OUTPUT"
+
+      - name: Publishing Process
+        id: publish
+        if: steps.finalize.outputs.should_finalize == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.finalize.outputs.release_version }}
+          TAG_EXISTS: ${{ steps.finalize.outputs.tag_exists }}
+        run: |
           echo "release_version=${RELEASE_VERSION}" >> "$GITHUB_OUTPUT"
 
           if [ -s NEXT-CHANGELOG-ENTRY.md ]; then
@@ -81,19 +132,21 @@ jobs:
             pnpm exec git-cliff --unreleased --output RELEASE_NOTES.md --strip header --bump
           fi
 
-          pnpm exec git-cliff --unreleased --bump --output CHANGELOG.md
-          : > NEXT-CHANGELOG-ENTRY.md
+          if [ "${TAG_EXISTS}" = "false" ]; then
+            pnpm exec git-cliff --unreleased --bump --output CHANGELOG.md
+            : > NEXT-CHANGELOG-ENTRY.md
 
-          git add CHANGELOG.md NEXT-CHANGELOG-ENTRY.md
-          git commit -m "chore(release): update changelog for ${RELEASE_VERSION}"
+            git add CHANGELOG.md NEXT-CHANGELOG-ENTRY.md
+            git commit -m "chore(release): update changelog for ${RELEASE_VERSION}"
 
-          git tag -a "${RELEASE_VERSION}" -m "Release ${RELEASE_VERSION}"
-          git push origin main --follow-tags
+            git tag -a "${RELEASE_VERSION}" -m "Release ${RELEASE_VERSION}"
+            git push origin main --follow-tags
+          fi
 
           echo "release_body_path=RELEASE_NOTES.md" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.finalize.outputs.should_finalize == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.publish.outputs.release_version }}

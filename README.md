@@ -25,6 +25,8 @@ Its key feature is a two-step release process:
 
 2. Publish: Once the PR is merged, the action publishes non-private packages, regenerates the
    root `CHANGELOG.md`, creates a Git tag, and publishes a polished GitHub Release.
+   If a package version was already published during validation, the workflow still finalizes the
+   repository release as long as the version PR landed and the root tag does not exist yet.
 
 Key Features:
 - 🚀 **Turborepo-Optimized**: High-speed CI leveraging Turborepo's caching and task orchestration.
@@ -88,10 +90,12 @@ graph TD
         H -- Has changesets --> I["Create or update<br/>Version Packages PR"];
         I --> J[PR Merged by User];
 
-        H -- No changesets, publishable package changed --> K["pnpm changeset publish"];
-        K --> L["git-cliff regenerates<br/>root CHANGELOG.md"];
-        L --> M["Commit changelog<br/>Create and push tag"];
-        M --> N[🚀 Create GitHub Release];
+        H -- No changesets --> K["pnpm changeset publish"];
+        K --> L{"Published now or<br/>version PR landed<br/>without root tag?"};
+        L -- Yes --> M["git-cliff regenerates<br/>root CHANGELOG.md"];
+        L -- No --> O["No repository release update"];
+        M --> P["Commit changelog<br/>Create and push tag"];
+        P --> N[🚀 Create GitHub Release];
     end
 
     E --> F;
