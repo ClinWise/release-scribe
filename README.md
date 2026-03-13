@@ -56,6 +56,18 @@ If you want to adapt the template to npmjs, update:
 - `scope` and `registry-url` in `.github/workflows/release.yml`
 - the authentication token used by CI
 
+## GitHub Actions Permissions
+
+The default workflow expects the release job to have:
+
+- `contents: write`
+- `pull-requests: write`
+- `packages: write`
+
+The sample workflow uses `GITHUB_TOKEN` for both version PR management and GitHub Packages
+publishing. If your target registry is not GitHub Packages, replace the auth token and registry
+settings together.
+
 ## The Workflow
 
 Here is a high-level overview of the CI and Release process:
