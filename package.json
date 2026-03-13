@@ -1,27 +1,24 @@
 {
-	"name": "release-scribe-monorepo",
-	"version": "0.2.4",
-	"private": true,
-	"engines": {
-		"node": ">=18"
-	},
-	"packageManager": "npm@10.9.0",
-	"workspaces": [
-		"apps/*",
-		"packages/*"
-	],
-	"scripts": {
-		"build": "turbo build",
-		"gen:sdk": "turbo run gen:sdk",
-		"lint": "turbo lint",
-		"test": "turbo test",
-		"changeset:version": "./scripts/changeset-version.sh",
-		"test:e2e": "turbo test:e2e",
-		"test:unit": "turbo test:unit"
-	},
-	"devDependencies": {
-		"@changesets/cli": "^2.29.4",
-		"turbo": "^2.4.1",
-		"git-cliff": "^2.10.0"
-	}
+  "name": "release-scribe-monorepo",
+  "version": "0.2.4",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@10.30.3",
+  "scripts": {
+    "build": "turbo run build",
+    "gen:sdk": "turbo run gen:sdk",
+    "lint": "turbo run lint",
+    "release:publish": "changeset publish",
+    "test": "turbo run test:unit",
+    "changeset:version": "./scripts/changeset-version.sh",
+    "test:e2e": "turbo run test:e2e",
+    "test:unit": "turbo run test:unit"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.4",
+    "git-cliff": "^2.10.0",
+    "turbo": "^2.4.1"
+  }
 }

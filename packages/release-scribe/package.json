@@ -1,0 +1,29 @@
+{
+  "name": "@clinwise/release-scribe",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Reference package used to validate the Release Scribe pnpm release workflow.",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ClinWise/release-scribe.git",
+    "directory": "packages/release-scribe"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  }
+}
