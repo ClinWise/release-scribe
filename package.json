@@ -8,6 +8,10 @@
   "packageManager": "pnpm@10.30.3",
   "scripts": {
     "build": "turbo run build",
+    "ci": "pnpm run ci:lint && pnpm run ci:test:unit && pnpm run ci:build",
+    "ci:build": "turbo run ci:build",
+    "ci:lint": "turbo run ci:lint",
+    "ci:test:unit": "turbo run ci:test:unit",
     "gen:sdk": "turbo run gen:sdk",
     "lint": "turbo run lint",
     "release:publish": "changeset publish",

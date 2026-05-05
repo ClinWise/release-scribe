@@ -11,6 +11,23 @@
 			"dependsOn": ["^build", "gen:prisma-all"],
 			"outputs": [".next/**", "!.next/cache/**"]
 		},
+		"ci:build": {
+			"dependsOn": ["^build", "gen:prisma-all"],
+			"outputs": [".next/**", "!.next/cache/**"]
+		},
+		"ci:lint": {
+			"dependsOn": ["^build"],
+			"outputs": []
+		},
+		"ci:test:unit": {
+			"dependsOn": ["^build"],
+			"outputs": []
+		},
+		"ci:test:unit:shard": {
+			"dependsOn": ["^build"],
+			"env": ["JEST_SHARD"],
+			"outputs": []
+		},
 		"test:unit": {
 			"dependsOn": ["^build"]
 		},

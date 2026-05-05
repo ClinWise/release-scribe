@@ -11,40 +11,260 @@ on:
       - develop
 
 env:
-  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
   NODE_VERSION: '20'
-  PNPM_VERSION: '10.30.3'
+  NODE_ENV: development
+  VITE_API_BASE_URL: ${{ vars.CI_API_BASE_URL }}
+  VITE_APP_ENV: ci
 
 jobs:
-  ci:
-    name: Lint, Test and Build
+  changes:
+    name: Change Detection
     runs-on: ubuntu-latest
+    outputs:
+      api: ${{ steps.detect.outputs.api }}
+      packages: ${{ steps.detect.outputs.packages }}
+      web: ${{ steps.detect.outputs.web }}
+
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
         with:
-          version: ${{ env.PNPM_VERSION }}
+          fetch-depth: 0
 
-      - name: Configure Node.js
-        uses: actions/setup-node@v4
+      - name: Detect Affected Groups
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          api=false
+          packages=false
+          root=false
+          web=false
+
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            api=true
+            packages=true
+            web=true
+          else
+            changed_files="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)"
+
+            echo "Changed files:"
+            if [[ -n "$changed_files" ]]; then
+              printf '%s\n' "$changed_files"
+            else
+              echo "(none)"
+            fi
+
+            while IFS= read -r file; do
+              [[ -z "$file" ]] && continue
+
+              case "$file" in
+                .github/*|.npmrc|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|tsconfig.json|turbo.json)
+                  root=true
+                  ;;
+              esac
+
+              case "$file" in
+                apps/api/*|packages/database/*)
+                  api=true
+                  ;;
+              esac
+
+              case "$file" in
+                apps/web/*)
+                  web=true
+                  ;;
+              esac
+
+              case "$file" in
+                packages/*)
+                  packages=true
+                  ;;
+              esac
+            done <<< "$changed_files"
+
+            if [[ "$root" == "true" ]]; then
+              api=true
+              packages=true
+              web=true
+            fi
+          fi
+
+          {
+            echo "api=$api"
+            echo "packages=$packages"
+            echo "web=$web"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "CI groups: api=$api packages=$packages web=$web"
+
+  packages-build:
+    name: Packages Build
+    needs: changes
+    if: needs.changes.outputs.packages == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup-pnpm
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Build Shared Packages
+        run: pnpm turbo run ci:build --filter=./packages/*
 
-      - name: Generate Prisma Client
-        run: pnpm turbo run gen:prisma-all
+  api-lint:
+    name: API Lint
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
 
-      - name: Run Lint, Test, and Build
-        run: pnpm turbo run lint test:unit build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: API lint
+        run: pnpm turbo run ci:lint --filter=@app/api
+
+  api-build:
+    name: API Build
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: API build
+        run: pnpm turbo run ci:build --filter=@app/api
+
+  api-test:
+    name: API Test (${{ matrix.shard }}/${{ matrix.total }})
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+        total: [3]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache-suffix: shard-${{ matrix.shard }}
+
+      - name: API test
+        run: pnpm turbo run ci:test:unit:shard --filter=@app/api
         env:
-          NODE_ENV: development
-          VITE_API_BASE_URL: ${{ vars.CI_API_BASE_URL }}
-          VITE_APP_ENV: ci
+          JEST_SHARD: ${{ matrix.shard }}/${{ matrix.total }}
+
+  web-lint:
+    name: Web Lint
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Web lint
+        run: pnpm turbo run ci:lint --filter=@app/web
+
+  web-test:
+    name: Web Test
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Web test
+        run: pnpm turbo run ci:test:unit --filter=@app/web
+
+  web-build:
+    name: Web Build
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup-pnpm
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Web build
+        run: pnpm turbo run ci:build --filter=@app/web
+
+  ci:
+    name: CI
+    needs:
+      - changes
+      - packages-build
+      - api-lint
+      - api-build
+      - api-test
+      - web-lint
+      - web-test
+      - web-build
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Parallel Results
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+
+      - name: Complete
+        run: echo "Selected CI jobs passed or were skipped."

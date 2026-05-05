@@ -4,6 +4,9 @@
 	"private": true,
 	"scripts": {
 		"build": "mkdir -p dist && touch dist/index.js && echo 'Simulating build...'",
+		"ci:build": "mkdir -p dist && touch dist/index.js && echo 'Simulating build...'",
+		"ci:lint": "echo 'Simulating lint...'",
+		"ci:test:unit": "echo 'Simulating unit tests...'",
 		"lint": "echo 'Simulating lint...'",
 		"test:unit": "echo 'Simulating unit tests...'",
 		"test:e2e": "echo 'Simulating e2e tests...'"

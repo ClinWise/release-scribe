@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  workflow_run:
+    workflows: ["Continuous Integration"]
+    types:
+      - completed
+    branches:
+      - main
 
 concurrency:
   group: release-${{ github.ref }}
@@ -16,6 +22,9 @@ env:
 
 jobs:
   release:
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     permissions:
       contents: write
       packages: write
@@ -29,22 +38,12 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Configure Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Workspace
+        uses: ./.github/actions/setup-pnpm
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-          cache-dependency-path: pnpm-lock.yaml
           registry-url: https://npm.pkg.github.com
           scope: '@clinwise'
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Install git-cliff
         uses: kenji-miyake/setup-git-cliff@v2
@@ -84,7 +83,7 @@ jobs:
           fi
 
           if [ -n "${CHANGE_RANGE_START}" ]; then
-            CHANGED_FILES="$(git diff --name-only "${CHANGE_RANGE_START}" "${GITHUB_SHA}")"
+            CHANGED_FILES="$(git diff --name-only "${CHANGE_RANGE_START}" "${GITHUB_SHA}" 2>/dev/null || git show --pretty='' --name-only "${GITHUB_SHA}")"
           else
             CHANGED_FILES="$(git show --pretty='' --name-only "${GITHUB_SHA}")"
           fi

@@ -2,102 +2,80 @@
 
 ![Release Scribe](./.github/logo.webp)
 
-*A powerful, automated release workflow for monorepos, powered by the trifecta of Turborepo, Changesets, and git-cliff.*
+*Changesets + git-cliff monorepo release automation template.*
 
-[![Continuous Integration](https://github.com/ClinWise/release-scribe/actions/workflows/ci.yml/badge.svg)](https://github.com/ClinWise/release-scribe/actions/workflows/ci.yml)
+[![CI](https://github.com/ClinWise/release-scribe/actions/workflows/ci.yml/badge.svg)](https://github.com/ClinWise/release-scribe/actions/workflows/ci.yml)
 [![Release](https://github.com/ClinWise/release-scribe/actions/workflows/release.yml/badge.svg)](https://github.com/ClinWise/release-scribe/actions/workflows/release.yml)
 
 </div>
 
-This repository is a `pnpm`-first release workflow template for monorepos. It integrates
-[changesets/action](https://github.com/changesets/action) with
-[git-cliff](https://github.com/orhun/git-cliff) and includes one real publishable demo package:
-[`@clinwise/release-scribe`](./packages/release-scribe).
+pnpm monorepo template integrating [changesets/action](https://github.com/changesets/action) with
+[git-cliff](https://github.com/orhun/git-cliff) for automated versioning and changelog generation.
+Includes a publishable demo package [`@clinwise/release-scribe`](./packages/release-scribe).
 
-While changesets is excellent for versioning in monorepos, its default changelog generation is limited.
+## Release Process
 
-This action enhances the process by using git-cliff to generate beautiful, structured changelogs from your Conventional Commits.
+Two-step workflow:
 
-Its key feature is a two-step release process:
+1. **Preview** — Changesets opens a version PR updating package versions, package changelogs,
+   and a pending root release note (`NEXT-CHANGELOG-ENTRY.md`).
+2. **Publish** — After merge, publishes non-private packages, regenerates root `CHANGELOG.md`,
+   creates a git tag, and publishes a GitHub Release. Falls back to repository-only finalization
+   if the package was already published during a prior validation run.
 
-1. Preview: When changesets creates a versioning pull request, this repository updates package
-   versions, package changelogs, and a pending root release note for review.
+## CI Architecture
 
-2. Publish: Once the PR is merged, the action publishes non-private packages, regenerates the
-   root `CHANGELOG.md`, creates a Git tag, and publishes a polished GitHub Release.
-   If a package version was already published during validation, the workflow still finalizes the
-   repository release as long as the version PR landed and the root tag does not exist yet.
+ci.yml implements change detection to avoid running unnecessary jobs:
 
-Key Features:
-- 🚀 **Turborepo-Optimized**: High-speed CI leveraging Turborepo's caching and task orchestration.
-- 📦 **pnpm-Native**: Workspace install, caching, and publish commands all use pnpm.
-- 🔄 **Automated Versioning**: Leverages changesets to manage package versions across the monorepo.
-- ✨ **Rich Changelogs**: Uses git-cliff to generate detailed changelogs from Conventional Commits.
-- 👀 **Reviewable Release Notes**: The "preview" changelog in the PR ensures transparency and quality control before a release goes live.
-- 🌳 **Monorepo-Ready**: Inherits changesets' excellent support for monorepos.
-- 🧪 **End-to-End Publish Proof**: `@clinwise/release-scribe` gives the template one real package to publish.
+1. `changes` job diffs against the base branch and maps files to workspace groups (`api`, `web`, `packages`). Push events run all groups unconditionally.
+2. Each affected group gets independent lint/build/test jobs. `api-test` runs across 3 shards.
+3. A final `ci` job aggregates results into a single required check for branch protection.
 
-> **Bonus: Prisma Support**
-> 
-> This workflow includes caching and generation steps for Prisma clients, demonstrating how to integrate database-related tasks into your CI/CD pipeline.
-> 
-> While not entirely generic, if you use Prisma, this might provide some valuable insights.
+All jobs share `.github/actions/setup-pnpm` — a composite action that bakes pnpm setup, Node.js config with caching, Turbo local cache (`actions/cache@v4` for `.turbo/cache`), and dependency install into one step.
 
-## Customizing the Version PR
+## Release Triggers
 
-When the changesets bot opens a version-package pull request, you may fine-tune the generated changelog to improve clarity and tone. Be aware that any modification to the version package MUST be performed at the very last moment—immediately before merging the PR. At that point the `main` branch has to be frozen: do **not** merge any other pull request that contains changeset files, otherwise the changesets action will issue a force-push which overwrites all your handcrafted commits in the version PR.
+release.yml supports two events:
 
-## Registry Targets
+- `push` to `main` — immediate release
+- `workflow_run` on CI completion — only after CI passes
 
-The template is configured to publish the demo package to GitHub Packages under the `@clinwise`
-scope. This matches private package flows such as `@clinwise/fhir-sdk` in `GCPM`.
+Concurrency group `release-${{ github.ref }}` prevents duplicate runs when both fire.
 
-If you want to adapt the template to npmjs, update:
+## Adapting
 
-- `publishConfig.registry` in the publishable package
-- `scope` and `registry-url` in `.github/workflows/release.yml`
-- the authentication token used by CI
+**Registry**: demo publishes to GitHub Packages (`@clinwise` scope). To switch to npmjs:
+- `publishConfig.registry` in the package
+- `scope` + `registry-url` in `.github/workflows/release.yml` (passed to `setup-pnpm` action)
+- auth token
 
-## GitHub Actions Permissions
+**Permissions** the release job needs:
+- `contents: write`, `pull-requests: write`, `packages: write`
 
-The default workflow expects the release job to have:
-
-- `contents: write`
-- `pull-requests: write`
-- `packages: write`
-
-The sample workflow uses `GITHUB_TOKEN` for both version PR management and GitHub Packages
-publishing. If your target registry is not GitHub Packages, replace the auth token and registry
-settings together.
-
-## The Workflow
-
-Here is a high-level overview of the CI and Release process:
-
+**Version PR**: manual changelog edits are allowed but must happen last — any other changeset
+merge before the version PR lands will cause changesets to force-push and overwrite edits.
 
 ```mermaid
 graph TD
-    subgraph "CI Pipeline (ci.yml)"
-        A[Push to main/develop or PR] --> B{Run CI Job};
-        B --> C[Checkout & Setup];
-        C --> D[Install Dependencies];
-        D --> E[Run Lint, Test & Build];
+    subgraph "CI (ci.yml)"
+        A[Push/PR] --> B{changes job};
+        B --> C1[api: lint, build, test×3];
+        B --> C2[web: lint, test, build];
+        B --> C3[packages: build];
+        C1 & C2 & C3 --> D[aggregate check];
     end
 
-    subgraph "Release Pipeline (release.yml)"
-        F[Push to main] --> G[Checkout & Install with pnpm];
-        G --> H{changesets/action};
-        H -- Has changesets --> I["Create or update<br/>Version Packages PR"];
-        I --> J[PR Merged by User];
-
-        H -- No changesets --> K["pnpm changeset publish"];
-        K --> L{"Published now or<br/>version PR landed<br/>without root tag?"};
-        L -- Yes --> M["git-cliff regenerates<br/>root CHANGELOG.md"];
-        L -- No --> O["No repository release update"];
-        M --> P["Commit changelog<br/>Create and push tag"];
-        P --> N[🚀 Create GitHub Release];
+    subgraph "Release (release.yml)"
+        E[Push to main<br/>or CI passed] --> F[setup-pnpm action];
+        F --> G{changesets/action};
+        G -->|has changesets| H[Version PR];
+        H --> I[Merge PR];
+        G -->|no changesets| J[publish];
+        J --> K{should finalize?};
+        K -->|yes| L[git-cliff → changelog → tag → release];
+        K -->|no| M[skip];
     end
 
-    E --> F;
-    J --> F;
+    D --> E;
+    I --> E;
 ```
