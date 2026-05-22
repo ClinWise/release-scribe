@@ -17,6 +17,10 @@ inputs:
     description: npm scope for registry authentication (optional).
     required: false
     default: ''
+  save-turbo-cache:
+    description: Whether to save the restored Turbo cache after the job.
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -36,6 +40,16 @@ runs:
         scope: ${{ inputs.scope }}
 
     - name: Restore Turbo local cache
+      if: inputs.save-turbo-cache == 'false'
+      uses: actions/cache/restore@v4
+      with:
+        path: .turbo/cache
+        key: turbo-${{ runner.os }}-${{ github.job }}-${{ inputs.cache-suffix }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-${{ github.sha }}
+        restore-keys: |
+          turbo-${{ runner.os }}-${{ github.job }}-${{ inputs.cache-suffix }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json') }}-
+
+    - name: Restore and save Turbo local cache
+      if: inputs.save-turbo-cache == 'true'
       uses: actions/cache@v4
       with:
         path: .turbo/cache

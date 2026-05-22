@@ -10,6 +10,10 @@ on:
       - main
       - develop
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   NODE_VERSION: '20'
   NODE_ENV: development
@@ -20,6 +24,7 @@ jobs:
   changes:
     name: Change Detection
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       api: ${{ steps.detect.outputs.api }}
       packages: ${{ steps.detect.outputs.packages }}
@@ -42,53 +47,56 @@ jobs:
           root=false
           web=false
 
-          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            changed_files="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)"
+          else
+            before_sha="${{ github.event.before }}"
+            if [[ -n "$before_sha" && "$before_sha" != "0000000000000000000000000000000000000000" ]]; then
+              changed_files="$(git diff --name-only "$before_sha" HEAD)"
+            else
+              changed_files="$(git show --pretty='' --name-only HEAD)"
+            fi
+          fi
+
+          echo "Changed files:"
+          if [[ -n "$changed_files" ]]; then
+            printf '%s\n' "$changed_files"
+          else
+            echo "(none)"
+          fi
+
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+
+            case "$file" in
+              .github/*|.github/**/*|.npmrc|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|tsconfig.json|turbo.json)
+                root=true
+                ;;
+            esac
+
+            case "$file" in
+              apps/api/*|apps/api/**/*|packages/database/*|packages/database/**/*)
+                api=true
+                ;;
+            esac
+
+            case "$file" in
+              apps/web/*|apps/web/**/*)
+                web=true
+                ;;
+            esac
+
+            case "$file" in
+              packages/*|packages/**/*)
+                packages=true
+                ;;
+            esac
+          done <<< "$changed_files"
+
+          if [[ "$root" == "true" ]]; then
             api=true
             packages=true
             web=true
-          else
-            changed_files="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)"
-
-            echo "Changed files:"
-            if [[ -n "$changed_files" ]]; then
-              printf '%s\n' "$changed_files"
-            else
-              echo "(none)"
-            fi
-
-            while IFS= read -r file; do
-              [[ -z "$file" ]] && continue
-
-              case "$file" in
-                .github/*|.npmrc|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|tsconfig.json|turbo.json)
-                  root=true
-                  ;;
-              esac
-
-              case "$file" in
-                apps/api/*|packages/database/*)
-                  api=true
-                  ;;
-              esac
-
-              case "$file" in
-                apps/web/*)
-                  web=true
-                  ;;
-              esac
-
-              case "$file" in
-                packages/*)
-                  packages=true
-                  ;;
-              esac
-            done <<< "$changed_files"
-
-            if [[ "$root" == "true" ]]; then
-              api=true
-              packages=true
-              web=true
-            fi
           fi
 
           {
@@ -99,150 +107,74 @@ jobs:
 
           echo "CI groups: api=$api packages=$packages web=$web"
 
-  packages-build:
-    name: Packages Build
+  packages:
+    name: Packages
     needs: changes
     if: needs.changes.outputs.packages == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Workspace
         uses: ./.github/actions/setup-pnpm
         with:
           node-version: ${{ env.NODE_VERSION }}
+          save-turbo-cache: 'false'
 
       - name: Build Shared Packages
         run: pnpm turbo run ci:build --filter=./packages/*
 
-  api-lint:
-    name: API Lint
+  api:
+    name: API
     needs: changes
     if: needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Workspace
         uses: ./.github/actions/setup-pnpm
         with:
           node-version: ${{ env.NODE_VERSION }}
+          save-turbo-cache: 'false'
 
       - name: API lint
         run: pnpm turbo run ci:lint --filter=@app/api
 
-  api-build:
-    name: API Build
-    needs: changes
-    if: needs.changes.outputs.api == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Workspace
-        uses: ./.github/actions/setup-pnpm
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
       - name: API build
         run: pnpm turbo run ci:build --filter=@app/api
 
-  api-test:
-    name: API Test (${{ matrix.shard }}/${{ matrix.total }})
-    needs: changes
-    if: needs.changes.outputs.api == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-        total: [3]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Workspace
-        uses: ./.github/actions/setup-pnpm
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache-suffix: shard-${{ matrix.shard }}
-
       - name: API test
-        run: pnpm turbo run ci:test:unit:shard --filter=@app/api
-        env:
-          JEST_SHARD: ${{ matrix.shard }}/${{ matrix.total }}
+        run: pnpm turbo run ci:test:unit --filter=@app/api
 
-  web-lint:
-    name: Web Lint
+  web:
+    name: Web
     needs: changes
     if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Workspace
         uses: ./.github/actions/setup-pnpm
         with:
           node-version: ${{ env.NODE_VERSION }}
+          save-turbo-cache: 'false'
 
       - name: Web lint
         run: pnpm turbo run ci:lint --filter=@app/web
 
-  web-test:
-    name: Web Test
-    needs: changes
-    if: needs.changes.outputs.web == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Workspace
-        uses: ./.github/actions/setup-pnpm
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
       - name: Web test
         run: pnpm turbo run ci:test:unit --filter=@app/web
-
-  web-build:
-    name: Web Build
-    needs: changes
-    if: needs.changes.outputs.web == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Workspace
-        uses: ./.github/actions/setup-pnpm
-        with:
-          node-version: ${{ env.NODE_VERSION }}
 
       - name: Web build
         run: pnpm turbo run ci:build --filter=@app/web
@@ -251,15 +183,12 @@ jobs:
     name: CI
     needs:
       - changes
-      - packages-build
-      - api-lint
-      - api-build
-      - api-test
-      - web-lint
-      - web-test
-      - web-build
+      - packages
+      - api
+      - web
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Check Parallel Results
